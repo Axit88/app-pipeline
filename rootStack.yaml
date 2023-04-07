@@ -13,7 +13,7 @@ Resources:
   VpcNestedStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub https://${BucketName}.s3.${AWS::Region}.amazonaws.com/vpc/createVpc.yaml
+      TemplateURL: !Sub https://${BucketName}.s3.${AWS::Region}.amazonaws.com/appCloudformation/createVpc.yaml
       Parameters:
         EnvironmentName: !Sub ${Environment}
         VpcCIDR: 10.0.0.0/16
@@ -27,7 +27,7 @@ Resources:
   EcsNestedStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub https://${BucketName}.s3.${AWS::Region}.amazonaws.com/ecs/ecs.yaml
+      TemplateURL: !Sub https://${BucketName}.s3.${AWS::Region}.amazonaws.com/appCloudformation/ecs.yaml
       Parameters:
         ClusterName: !Sub ${Environment}ecs-cluster 
         TaskDefinitionFamilyName: !Sub ${Environment}default-ecs-task-family
@@ -55,7 +55,7 @@ Resources:
   LambdaNestedStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub https://${BucketName}.s3.${AWS::Region}.amazonaws.com/lambda/lambdaFunction.yaml
+      TemplateURL: !Sub https://${BucketName}.s3.${AWS::Region}.amazonaws.com/appCloudformation/lambdaFunction.yaml
       Parameters:
         S3Bucket: axitsamplepipelinebucket
         S3Key: archive.zip
@@ -77,7 +77,7 @@ Resources:
   ApiGatewayNestedStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub https://${BucketName}.s3.${AWS::Region}.amazonaws.com/apiGateway/apiGateway.yaml
+      TemplateURL: !Sub https://${BucketName}.s3.${AWS::Region}.amazonaws.com/appCloudformation/apiGateway.yaml
       Parameters:
         ApiGatewayName: !Sub ${Environment}nested-api-gateway
         ApiGatewayStageName: test
@@ -97,7 +97,7 @@ Resources:
   Ec2NestedStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub https://${BucketName}.s3.${AWS::Region}.amazonaws.com/ec2/instance.yaml
+      TemplateURL: !Sub https://${BucketName}.s3.${AWS::Region}.amazonaws.com/appCloudformation/instance.yaml
       Parameters:
         InstanceName: !Sub ${Environment}NewEc2Instance
         ImageId: ami-06fdbb60c8e83aa5e
