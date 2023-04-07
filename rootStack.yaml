@@ -12,7 +12,6 @@ Parameters:
 Resources:
   VpcNestedStack:
     Type: AWS::CloudFormation::Stack
-    DependsOn: OUPolicyNestedStack
     Properties:
       TemplateURL: !Sub https://${BucketName}.s3.${AWS::Region}.amazonaws.com/vpc/createVpc.yaml
       Parameters:

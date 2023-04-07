@@ -16,7 +16,7 @@ Parameters:
     Default: main
   OAuthToken:
     Type: String
-    Default: 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
+    Default: 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
   BucketName:
     Type: String
     Default: axitsamplepipelinebucket
@@ -186,20 +186,6 @@ Resources:
       LogsConfig:
         CloudWatchLogs:
           Status: ENABLED
-
-  # LambdaWebhook:
-  #   Type: AWS::CodePipeline::Webhook
-  #   Properties:
-  #     Authentication: GITHUB_HMAC
-  #     AuthenticationConfiguration:
-  #       SecretToken: !Ref OAuthToken
-  #     Filters:
-  #       - JsonPath: $.ref
-  #         MatchEquals: !Sub refs/heads/main
-  #     TargetAction: Source 
-  #     TargetPipeline: !Ref AppCodePipeline
-  #     TargetPipelineVersion: !GetAtt AppCodePipeline.Version
-  #     RegisterWithThirdParty: 'true' 
   
   IAMRoleForAppCodePipeline:
     Type: "AWS::IAM::Role"
@@ -346,7 +332,7 @@ Resources:
               - appconfig:GetDeployment
               Resource: "*" 
 
-  IAMRoleForLambdaCodeBuild:
+  IAMRoleForAppPipelineCodeBuild:
     Type: "AWS::IAM::Role"
     Properties:
       Path: "/"
@@ -403,6 +389,20 @@ Resources:
         - "arn:aws:iam::aws:policy/AmazonS3FullAccess" 
         - "arn:aws:iam::aws:policy/AWSLambda_FullAccess"
         - "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"
+  
+  # LambdaWebhook:
+  #   Type: AWS::CodePipeline::Webhook
+  #   Properties:
+  #     Authentication: GITHUB_HMAC
+  #     AuthenticationConfiguration:
+  #       SecretToken: !Ref OAuthToken
+  #     Filters:
+  #       - JsonPath: $.ref
+  #         MatchEquals: !Sub refs/heads/main
+  #     TargetAction: Source 
+  #     TargetPipeline: !Ref AppCodePipeline
+  #     TargetPipelineVersion: !GetAtt AppCodePipeline.Version
+  #     RegisterWithThirdParty: 'true' 
 
 Outputs:
   AppCodePipeline:
@@ -411,6 +411,6 @@ Outputs:
     Export:
       Name: AppCodePipeline
   
-# aws cloudformation create-stack --stack-name pipelineLambda --template-body file://pipeline.yaml --capabilities CAPABILITY_NAMED_IAM --disable-rollback
+# aws cloudformation create-stack --stack-name AppPipeline --template-body file://pipeline.yaml --capabilities CAPABILITY_NAMED_IAM --disable-rollback
 
-# aws cloudformation update-stack --stack-name pipelineLambda --template-body file://pipeline.yaml --capabilities CAPABILITY_NAMED_IAM --disable-rollback
+# aws cloudformation update-stack --stack-name AppPipeline --template-body file://pipeline.yaml --capabilities CAPABILITY_NAMED_IAM --disable-rollback
