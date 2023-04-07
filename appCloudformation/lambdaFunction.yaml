@@ -197,19 +197,15 @@ Resources:
   #     AlarmActions:
   #       - !Ref SNSTopic
 
-# Outputs:
-#   LambdaFunctionName:
-#     Description: Lambda Function Name
-#     Value: !Ref LambdaFunction
-#     Export:
-#       Name: LambdaFunctionName
-
-#   LambdaFunctionArn:
-#     Description: Lambda Function Arn
-#     Value: !GetAtt LambdaFunction.Arn
-#     Export:
-#       Name: LambdaFunctionArn
-      
+Outputs:
+  LambdaFunctionName:
+    Description: Lambda Function Name
+    Value: !Ref LambdaFunction
+    
+  LambdaFunctionArn:
+    Description: Lambda Function Arn
+    Value: !GetAtt LambdaFunction.Arn
+    
 #   IAMRoleLambda:
 #     Description: Role for sample Lambda
 #     Value: !Ref IAMRoleForLambda
