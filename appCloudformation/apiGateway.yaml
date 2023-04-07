@@ -1,0 +1,157 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Creating api gateway to invoke lambda function
+
+Parameters:
+  ApiGatewayName:
+    Type: String
+    Default: default-test-api
+
+  ApiGatewayStageName:
+    Type: String
+    Default: test
+
+  ApiGatewayHTTPMethod:
+    Type: String
+    Default: POST
+
+  LambdaFunctionArn:
+    Type: String 
+
+  LambdaFunctionName: 
+    Type: String
+
+  SNSTopic: 
+    Type: String
+    
+Resources:
+  apiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Description: Example API Gateway
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Name: !Ref ApiGatewayName
+      Tags:
+        - Key: env 
+          Value: integration 
+        - Key: application 
+          Value: apigateway  
+
+  apiGatewayRootMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: !Ref ApiGatewayHTTPMethod
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
+          - lambdaArn: !Ref LambdaFunctionArn
+      ResourceId: !GetAtt apiGateway.RootResourceId
+      RestApiId: !Ref apiGateway
+
+  apiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - apiGatewayRootMethod
+    Properties:
+      RestApiId: !Ref apiGateway
+      StageName: !Ref ApiGatewayStageName
+
+  lambdaApiGatewayInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref LambdaFunctionName
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${apiGateway}/*/POST/
+
+  # If you want enable the cloudwatch logs for api gateway then uncomment below code. This is one time process after that all your api gateway has cloudwatch logs access.
+
+  # apiGatewayCloudwatchAccessRole: 
+  #   Type: AWS::IAM::Role
+  #   Properties:
+  #     Path: "/"
+  #     RoleName: apiGatewayCloudwatchAccessRole
+  #     AssumeRolePolicyDocument:
+  #       Version: "2012-10-17"
+  #       Statement:
+  #         - Effect: "Allow"
+  #           Principal:
+  #             Service:
+  #               - "apigateway.amazonaws.com"
+  #           Action:
+  #             - "sts:AssumeRole"
+  #     ManagedPolicyArns:
+  #       - "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+
+  # cloudwatchLogAccess:               
+  #   Type: AWS::ApiGateway::Account
+  #   Properties: 
+  #     CloudWatchRoleArn: !GetAtt apiGatewayCloudwatchAccessRole.Arn
+
+  # ApiGatewayLatencyAlarm:
+  #   Type: AWS::CloudWatch::Alarm
+  #   Properties:
+  #     AlarmName: ApiGatewayLatencyAlarm
+  #     Namespace: AWS/ApiGateway
+  #     MetricName: Latency
+  #     Dimensions:
+  #       - Name: ApiName
+  #         Value: !Ref ApiGatewayName
+  #     Statistic: Average
+  #     Period: 300 
+  #     ComparisonOperator: GreaterThanOrEqualToThreshold
+  #     Threshold: 1000 # Milliseconds 
+  #     DatapointsToAlarm: 1
+  #     EvaluationPeriods: 1 
+  #     ActionsEnabled: true
+  #     AlarmActions:
+  #       - !Ref SNSTopic
+
+  # ApiGateway5xxErrorAlarm:
+  #   Type: AWS::CloudWatch::Alarm
+  #   Properties:
+  #     AlarmName: ApiGateway5xxErrorAlarm
+  #     Namespace: AWS/ApiGateway
+  #     MetricName: 4XXError
+  #     Dimensions:
+  #       - Name: ApiName
+  #         Value: !Ref ApiGatewayName
+  #     Statistic: Sum
+  #     Period: 300 
+  #     ComparisonOperator: GreaterThanOrEqualToThreshold
+  #     Threshold: 5 # Count 
+  #     DatapointsToAlarm: 1
+  #     EvaluationPeriods: 1 
+  #     ActionsEnabled: true
+  #     AlarmActions:
+  #       - !Ref SNSTopic
+  
+  # ApiGateway4xxErrorAlarm:
+  #   Type: AWS::CloudWatch::Alarm
+  #   Properties:
+  #     AlarmName: ApiGateway4xxErrorAlarm
+  #     Namespace: AWS/ApiGateway
+  #     MetricName: 5XXError
+  #     Dimensions:
+  #       - Name: ApiName
+  #         Value: !Ref ApiGatewayName
+  #     Statistic: Sum
+  #     Period: 300 
+  #     ComparisonOperator: GreaterThanOrEqualToThreshold
+  #     Threshold: 5 # Count  
+  #     DatapointsToAlarm: 1
+  #     EvaluationPeriods: 1 
+  #     ActionsEnabled: true
+  #     AlarmActions:
+  #       - !Ref SNSTopic
+
+# Outputs:
+#   ApiGatewayInvokeURL:
+#     Description: API Gateway for lambda
+#     Value: !Sub https://${apiGateway}.execute-api.${AWS::Region}.amazonaws.com/${ApiGatewayStageName}
+#     Export:
+#       Name: ApiGatewayInvokeURL

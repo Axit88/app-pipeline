@@ -1,0 +1,142 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Creating ECS cluster and ECS task
+
+Parameters:
+  ClusterName: 
+    Type: String
+    Default: ecs-cluster 
+  
+  TaskDefinitionFamilyName: 
+    Type: String
+    Default: default-ecs-task-family
+  
+  ContainerName: 
+    Type: String
+    Default: default-python-container
+  
+  ContainerImage:
+    Type: String
+    Default: 803928384365.dkr.ecr.ap-northeast-1.amazonaws.com/python:latest
+  
+  ContainerPort:
+    Type: Number
+    Default: 5000
+  
+  EcsTaskExecutionRoleName: 
+    Type: String
+    Default: EcsTaskExecutionNewRole
+  
+  EcsServiceName: 
+    Type: String
+    Default: default-ecs-service
+  
+  Subnet1: 
+    Type: String
+
+  Subnet2: 
+    Type: String
+  
+  VpcId: 
+    Type: String
+  
+  EcsSecurityGroupName: 
+    Type: String
+    Default: EcsSecurityGroup
+
+Resources:
+  EcsCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Ref ClusterName
+
+  EcsTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Ref TaskDefinitionFamilyName
+      RequiresCompatibilities:
+        - FARGATE
+      NetworkMode: awsvpc
+      Memory: 512
+      Cpu: 256
+      ExecutionRoleArn: !Ref EcsTaskExecutionRole
+      ContainerDefinitions:
+        - Name: !Ref ContainerName
+          Image: !Ref ContainerImage
+          PortMappings:
+            - ContainerPort: !Ref ContainerPort
+
+  EcsService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: !Ref EcsCluster
+      ServiceName: !Ref EcsServiceName
+      TaskDefinition: !Ref EcsTaskDefinition
+      LaunchType: FARGATE
+      DesiredCount: 1 
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 50
+        MaximumPercent: 200
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          Subnets:
+            - !Ref Subnet1
+            - !Ref Subnet2
+          SecurityGroups:
+            - !Ref EcsSecurityGroup
+          AssignPublicIp: ENABLED
+      SchedulingStrategy: REPLICA
+      PlatformVersion: LATEST
+  
+  EcsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupName: !Ref EcsSecurityGroupName 
+      GroupDescription: Security group for ecs
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5000
+          ToPort: 5000
+          CidrIp: "0.0.0.0/0"  
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: "0.0.0.0/0"
+
+  EcsTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: "/"
+      RoleName: !Ref EcsTaskExecutionRoleName
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "ecs-tasks.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy" 
+
+# Outputs:
+#   EcsCluster:
+#     Description: EcsCluster Detail
+#     Value: !Ref EcsCluster
+#     Export:
+#       Name: EcsCluster 
+
+#   EcsServiceName:
+#     Description: EcsService Detail and configs
+#     Value: !Ref EcsServiceName
+#     Export:
+#       Name: EcsServiceName 
+

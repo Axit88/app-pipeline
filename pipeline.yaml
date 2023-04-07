@@ -1,0 +1,416 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Lambda CodePipeline with Cloudformation 
+
+Parameters:
+  PipeLineName:
+    Type: String
+    Default: app-pipeline
+  ConfigurationOwner:
+    Type: String
+    Default: Axit88
+  Repo:
+    Type: String
+    Default: app-pipeline
+  Branch:
+    Type: String
+    Default: main
+  OAuthToken:
+    Type: String
+    Default: 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
+  BucketName:
+    Type: String
+    Default: axitsamplepipelinebucket
+  DeployStackName:
+    Type: String
+    Default: AppPipelineStack
+  AppCodePipelineRoleName: 
+    Type: String
+    Default: nested-AppCodePipeline-role
+  IAMRoleForLambdaCodeBuildName:
+    Type: String
+    Default: appPipeline-nested-IAMRoleForLambdaCodeBuild
+  IAMRoleForDeployAppCodePipelineName:
+    Type: String
+    Default: nested-IAMRoleForDeployAppCodePipeline
+  BuildType: 
+    Type: String
+    Default: LINUX_CONTAINER
+  BuildImage:
+    Type: String
+    Default: aws/codebuild/amazonlinux2-x86_64-standard:4.0
+  BuildComputeType: 
+    Type: String
+    Default: BUILD_GENERAL1_SMALL
+
+Resources:
+  AppCodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      ArtifactStore:
+        Type: S3
+        Location: !Ref BucketName
+      Name: !Ref PipeLineName
+      RestartExecutionOnUpdate: true 
+      RoleArn: !GetAtt IAMRoleForAppCodePipeline.Arn
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Version: "1"
+                Provider: GitHub
+              Configuration:
+                Owner: !Ref ConfigurationOwner
+                Repo: !Ref Repo
+                Branch: !Ref Branch
+                OAuthToken: !Ref OAuthToken
+                PollForSourceChanges: false
+              OutputArtifacts:
+                - Name: SourceOutput
+              RunOrder: 1
+
+        - Name: Build
+          Actions:
+            - Name: Build
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              InputArtifacts:
+                - Name: SourceOutput
+              OutputArtifacts:
+                - Name: BuildOutput
+              Configuration:
+                ProjectName: !Ref BuildProject
+              RunOrder: 1
+
+        - Name: Dev
+          Actions:
+            - Name: Deploy
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: "1"
+                Provider: CloudFormation
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: !Sub Dev${DeployStackName}
+                Capabilities: CAPABILITY_NAMED_IAM
+                TemplatePath: BuildOutput::rootStack.yaml
+                TemplateConfiguration: BuildOutput::devParameter.json
+                RoleArn: !GetAtt IAMRoleForDeployAppCodePipeline.Arn
+              InputArtifacts: 
+                - Name: BuildOutput
+              RunOrder: 1
+        
+        - Name: Qa
+          Actions:
+            - Name: Approval
+              RunOrder: 1
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Provider: Manual
+                Version: '1'
+              Configuration:
+                CustomData: Approve or Reject this change 
+            - Name: Deploy
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: "1"
+                Provider: CloudFormation
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: !Sub Qa${DeployStackName}
+                Capabilities: CAPABILITY_NAMED_IAM
+                TemplatePath: BuildOutput::rootStack.yaml
+                TemplateConfiguration: BuildOutput::qaParameter.json
+                RoleArn: !GetAtt IAMRoleForDeployAppCodePipeline.Arn
+              InputArtifacts: 
+                - Name: BuildOutput
+              RunOrder: 2
+
+        - Name: Prod
+          Actions:
+            - Name: Approval
+              RunOrder: 1
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Provider: Manual
+                Version: '1'
+              Configuration:
+                CustomData: Approve or Reject this change 
+            - Name: Deploy
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: "1"
+                Provider: CloudFormation
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                StackName: !Sub Prod${DeployStackName}
+                Capabilities: CAPABILITY_NAMED_IAM
+                TemplatePath: BuildOutput::rootStack.yaml
+                TemplateConfiguration: BuildOutput::prodParameter.json
+                RoleArn: !GetAtt IAMRoleForDeployAppCodePipeline.Arn
+              InputArtifacts: 
+                - Name: BuildOutput
+              RunOrder: 2
+
+  BuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: AppPipelineBuildProject
+      Source:
+        Type: GITHUB
+        Location: !Sub 'https://github.com/${ConfigurationOwner}/${Repo}.git'
+      Artifacts:
+        Type: S3 
+        Name: CentralBuildProjectArtifacts
+        Location: !Ref BucketName
+      # Triggers:
+      #   Webhook: true
+      Environment:
+        Type: !Ref BuildType
+        Image: !Ref BuildImage
+        ComputeType: !Ref BuildComputeType
+        ImagePullCredentialsType: CODEBUILD
+      ServiceRole: !GetAtt IAMRoleForAppPipelineCodeBuild.Arn
+      TimeoutInMinutes: 60
+      QueuedTimeoutInMinutes: 480
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+
+  # LambdaWebhook:
+  #   Type: AWS::CodePipeline::Webhook
+  #   Properties:
+  #     Authentication: GITHUB_HMAC
+  #     AuthenticationConfiguration:
+  #       SecretToken: !Ref OAuthToken
+  #     Filters:
+  #       - JsonPath: $.ref
+  #         MatchEquals: !Sub refs/heads/main
+  #     TargetAction: Source 
+  #     TargetPipeline: !Ref AppCodePipeline
+  #     TargetPipelineVersion: !GetAtt AppCodePipeline.Version
+  #     RegisterWithThirdParty: 'true' 
+  
+  IAMRoleForAppCodePipeline:
+    Type: "AWS::IAM::Role"
+    Properties:
+      Path: "/"
+      RoleName: !Ref AppCodePipelineRoleName
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "codepipeline.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Tags:
+        - Key: env 
+          Value: integration 
+        - Key: application 
+          Value: AppCodePipeline 
+      Policies:
+        - PolicyName: AppCodePipelinePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+            - Action:
+              - iam:PassRole
+              Resource: "*"
+              Effect: Allow
+              Condition:
+                StringEqualsIfExists:
+                  iam:PassedToService:
+                  - cloudformation.amazonaws.com
+                  - elasticbeanstalk.amazonaws.com
+                  - ec2.amazonaws.com
+                  - ecs-tasks.amazonaws.com
+            - Action:
+              - codecommit:CancelUploadArchive
+              - codecommit:GetBranch
+              - codecommit:GetCommit
+              - codecommit:GetRepository
+              - codecommit:GetUploadArchiveStatus
+              - codecommit:UploadArchive
+              Resource: "*"
+              Effect: Allow
+            - Action:
+              - codedeploy:CreateDeployment
+              - codedeploy:GetApplication
+              - codedeploy:GetApplicationRevision
+              - codedeploy:GetDeployment
+              - codedeploy:GetDeploymentConfig
+              - codedeploy:RegisterApplicationRevision
+              Resource: "*"
+              Effect: Allow
+            - Action:
+              - codestar-connections:UseConnection
+              Resource: "*"
+              Effect: Allow
+            - Action:
+              - elasticbeanstalk:*
+              - ec2:*
+              - elasticloadbalancing:*
+              - autoscaling:*
+              - cloudwatch:*
+              - s3:*
+              - sns:*
+              - cloudformation:*
+              - rds:*
+              - sqs:*
+              - ecs:*
+              Resource: "*"
+              Effect: Allow
+            - Action:
+              - lambda:InvokeFunction
+              - lambda:ListFunctions
+              Resource: "*"
+              Effect: Allow
+            - Action:
+              - opsworks:CreateDeployment
+              - opsworks:DescribeApps
+              - opsworks:DescribeCommands
+              - opsworks:DescribeDeployments
+              - opsworks:DescribeInstances
+              - opsworks:DescribeStacks
+              - opsworks:UpdateApp
+              - opsworks:UpdateStack
+              Resource: "*"
+              Effect: Allow
+            - Action:
+              - cloudformation:CreateStack
+              - cloudformation:DeleteStack
+              - cloudformation:DescribeStacks
+              - cloudformation:UpdateStack
+              - cloudformation:CreateChangeSet
+              - cloudformation:DeleteChangeSet
+              - cloudformation:DescribeChangeSet
+              - cloudformation:ExecuteChangeSet
+              - cloudformation:SetStackPolicy
+              - cloudformation:ValidateTemplate
+              Resource: "*"
+              Effect: Allow
+            - Action:
+              - codebuild:BatchGetBuilds
+              - codebuild:StartBuild
+              - codebuild:BatchGetBuildBatches
+              - codebuild:StartBuildBatch
+              Resource: "*"
+              Effect: Allow
+            - Effect: Allow
+              Action:
+              - devicefarm:ListProjects
+              - devicefarm:ListDevicePools
+              - devicefarm:GetRun
+              - devicefarm:GetUpload
+              - devicefarm:CreateUpload
+              - devicefarm:ScheduleRun
+              Resource: "*"
+            - Effect: Allow
+              Action:
+              - servicecatalog:ListProvisioningArtifacts
+              - servicecatalog:CreateProvisioningArtifact
+              - servicecatalog:DescribeProvisioningArtifact
+              - servicecatalog:DeleteProvisioningArtifact
+              - servicecatalog:UpdateProduct
+              Resource: "*"
+            - Effect: Allow
+              Action:
+              - cloudformation:ValidateTemplate
+              Resource: "*"
+            - Effect: Allow
+              Action:
+              - ecr:DescribeImages
+              Resource: "*"
+            - Effect: Allow
+              Action:
+              - states:DescribeExecution
+              - states:DescribeStateMachine
+              - states:StartExecution
+              Resource: "*"
+            - Effect: Allow
+              Action:
+              - appconfig:StartDeployment
+              - appconfig:StopDeployment
+              - appconfig:GetDeployment
+              Resource: "*" 
+
+  IAMRoleForLambdaCodeBuild:
+    Type: "AWS::IAM::Role"
+    Properties:
+      Path: "/"
+      RoleName: !Ref IAMRoleForLambdaCodeBuildName
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "codebuild.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Tags:
+        - Key: env 
+          Value: integration 
+        - Key: application 
+          Value: AppCodePipeline 
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+        - "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess"
+
+  IAMRoleForDeployAppCodePipeline:
+    Type: "AWS::IAM::Role"
+    Properties:
+      Path: "/"
+      RoleName: !Ref IAMRoleForDeployAppCodePipelineName
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "cloudformation.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: codeDeployPolicyForAppPipeline
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+            - Action:
+              - organizations:*
+              - lambda:*
+              - ecs:*
+              - ec2:*
+              - ecr-public:*
+              - ecr:*
+              - apigateway:*
+              - execute-api:*
+              Resource: "*"
+              Effect: Allow
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonS3FullAccess" 
+        - "arn:aws:iam::aws:policy/AWSLambda_FullAccess"
+        - "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"
+
+Outputs:
+  AppCodePipeline:
+    Description: AppCodePipeline Detail
+    Value: !Ref AppCodePipeline
+    Export:
+      Name: AppCodePipeline
+  
+# aws cloudformation create-stack --stack-name pipelineLambda --template-body file://pipeline.yaml --capabilities CAPABILITY_NAMED_IAM --disable-rollback
+
+# aws cloudformation update-stack --stack-name pipelineLambda --template-body file://pipeline.yaml --capabilities CAPABILITY_NAMED_IAM --disable-rollback

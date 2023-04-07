@@ -1,0 +1,248 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Creating ec2 instance with SSM 
+
+Parameters:
+  InstanceName: 
+    Type: String
+    Default: Ec2Instance 
+
+  ImageId: 
+    Type: String
+    Default: ami-0329eac6c5240c99d 
+
+  InstanceType: 
+    Type: String
+    Default: t2.micro 
+
+  Ec2SecurityGroupName: 
+    Type: String
+    Default: ec2-security-group 
+
+  VpcId: 
+    Type: String
+
+  VolumeSize: 
+    Type: Number
+    Default: 8
+  
+  Subnet: 
+    Type: String
+  
+  SNSTopic: 
+    Type: String
+  
+  InstanceProfileName: 
+    Type: String
+    Default: InstanceProfilForEc2 
+  
+  RoleName: 
+    Type: String
+    Default: IamEc2RoleForSSM
+  
+  Device1: 
+    Type: String
+    Default: /dev/xvda
+  
+  Device2: 
+    Type: String
+    Default: /dev/xvdb
+  
+  VolumeType: 
+    Type: String
+    Default: gp2
+
+
+Resources:
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      
+      SecurityGroupIds:
+        - !Ref EC2SecurityGroup
+      SubnetId: !Ref Subnet
+      IamInstanceProfile: !Ref IamEc2InstanceProfile
+      Tags:
+        - Key: Name
+          Value: !Ref InstanceName
+        - Key: env 
+          Value: integration 
+        - Key: application 
+          Value: ec2  
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          sudo yum update -y
+          sudo yum install -y ruby
+          sudo yum install -y wget
+          sudo yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
+          cd /home/ec2-user
+          wget https://aws-codedeploy-ap-northeast-1.s3.ap-northeast-1.amazonaws.com/latest/install
+          chmod +x ./install
+          sudo ./install auto
+
+          # Create a configuration file for the agent
+          cat << EOF | sudo tee /opt/aws/amazon-cloudwatch-agent/bin/config.json
+          {
+            "metrics": {
+              "metrics_collected": {
+                "mem": {
+                  "measurement": [
+                    "mem_used_percent"
+                  ]
+                },
+                "disk": {
+                  "measurement": [
+                    "used_percent"
+                  ],
+                  "resources": [
+                    "*"
+                  ]
+                }
+              },
+              "append_dimensions": {
+                "Ec2Name": "demoEc2Instance"
+              }
+            }
+          }
+          EOF
+
+          # Start the CloudWatch agent service
+          sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/bin/config.json -s
+          sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -m ec2 -a start
+
+      BlockDeviceMappings:
+        - DeviceName: !Ref Device1
+          Ebs:
+            VolumeSize: !Ref VolumeSize
+            VolumeType: !Ref VolumeType
+            Encrypted: true 
+
+  IamEc2InstanceProfile:  
+    Type: "AWS::IAM::InstanceProfile"
+    Properties: 
+      InstanceProfileName: !Ref InstanceProfileName
+      Path: "/"
+      Roles: 
+        - !Ref IamEc2RoleForSSM
+
+  IamEc2RoleForSSM:
+    Type: "AWS::IAM::Role"
+    Properties:
+      Path: "/"
+      RoleName: !Ref RoleName
+      Tags:
+        - Key: env 
+          Value: integration 
+        - Key: application 
+          Value: ec2 
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "ec2.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM" 
+        - "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+       
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupName: !Ref Ec2SecurityGroupName
+      GroupDescription: EC2 security group
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: env 
+          Value: integration 
+        - Key: application 
+          Value: ec2  
+
+  EBSVolume:
+    Type: AWS::EC2::Volume
+    Properties:
+      AvailabilityZone: !GetAtt EC2Instance.AvailabilityZone
+      Size: !Ref VolumeSize
+      Encrypted: true 
+      VolumeType: !Ref VolumeType
+
+  Ec2VolumeAttachment:
+    Type: AWS::EC2::VolumeAttachment
+    Properties:
+      Device: !Ref Device2
+      InstanceId: !Ref EC2Instance
+      VolumeId: !Ref EBSVolume
+  
+  # Ec2MemoryAlarm:
+  #   Type: AWS::CloudWatch::Alarm
+  #   Properties:
+  #     AlarmName: EC2MemoryAlarm
+  #     ComparisonOperator: GreaterThanOrEqualToThreshold
+  #     EvaluationPeriods: 2
+  #     MetricName: mem_used_percent
+  #     Namespace: CWAgent
+  #     Period: 60
+  #     Statistic: Average
+  #     Threshold: 80 
+  #     AlarmActions:
+  #       - !Ref SNSTopic
+  #     Dimensions:
+  #       - Name: Ec2Name
+  #         Value: !Ref InstanceName
+  
+  # Ec2CPUUtilizationAlarm:
+  #   Type: AWS::CloudWatch::Alarm
+  #   Properties:
+  #     AlarmName: Ec2CPUUtilizationAlarm     
+  #     Metrics:
+  #     - Expression: ANOMALY_DETECTION_BAND(ec2, 1)
+  #       Id: adEc2
+  #     - Id: ec2 
+  #       MetricStat:
+  #         Metric:
+  #           Namespace: AWS/EC2
+  #           MetricName: CPUUtilization
+  #           Dimensions:
+  #           - Name: InstanceId
+  #             Value: !Ref EC2Instance
+  #         Period: 300
+  #         Stat: Average 
+  #     ComparisonOperator: LessThanLowerOrGreaterThanUpperThreshold
+  #     ThresholdMetricId: adEc2
+  #     DatapointsToAlarm: 1
+  #     EvaluationPeriods: 1 
+  #     ActionsEnabled: true
+  #     AlarmActions:
+  #       - !Ref SNSTopic
+
+# Outputs: 
+#   EC2Instance:
+#     Description: instance details
+#     Value: !Ref EC2Instance
+#     Export: 
+#       Name: EC2Instance 
+  
+#   Ec2InstanceName:
+#     Description: EC2Instance Name
+#     Value: !Ref InstanceName
+#     Export: 
+#       Name: Ec2InstanceName 
+
+#   EC2InstanceProfile:
+#     Description: ec2 instance profile
+#     Value: !Ref IamEc2InstanceProfile
+#     Export: 
+#       Name: EC2InstanceProfile 
+
+#aws cloudformation create-stack --stack-name instanceStack --template-body file://instance.yaml --capabilities CAPABILITY_NAMED_IAM --disable-rollback
+#aws cloudformation update-stack --stack-name instanceStack --template-body file://instance.yaml --capabilities CAPABILITY_NAMED_IAM --disable-rollback 
+
