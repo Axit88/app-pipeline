@@ -26,7 +26,7 @@ Parameters:
     Type: String
   SNSTopic: 
     Type: String
-  LambdaSecurityGroup: 
+  LambdaSecurityGroupName: 
     Type: String
     Default: LambdaSecurityGroup
     
@@ -90,7 +90,7 @@ Resources:
   LambdaSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties: 
-      GroupName: !Ref LambdaSecurityGroup 
+      GroupName: !Ref LambdaSecurityGroupName  
       GroupDescription: Security group with ingress rule
       VpcId: !Ref VpcId 
       Tags:

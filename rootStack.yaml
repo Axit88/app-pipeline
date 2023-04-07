@@ -63,7 +63,7 @@ Resources:
         RoleName: !Sub ${Environment}nested-lambda-role
         Runtime: go1.x
         Handler: main
-        LambdaSecurityGroup: !Sub ${Environment}LambdaSecurityGroup
+        LambdaSecurityGroupName: !Sub ${Environment}LambdaSecurityGroup
         VpcId: 
            Fn::GetAtt:
             - VpcNestedStack

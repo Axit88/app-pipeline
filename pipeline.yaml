@@ -16,7 +16,7 @@ Parameters:
     Default: main
   OAuthToken:
     Type: String
-    Default: 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 #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
+    Default: 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 #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
   BucketName:
     Type: String
     Default: axitsamplepipelinebucket
@@ -212,7 +212,7 @@ Resources:
             Version: "2012-10-17"
             Statement:
             - Action:
-              - iam:PassRole
+              - iam:*
               Resource: "*"
               Effect: Allow
               Condition:
@@ -375,21 +375,23 @@ Resources:
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
-            - Action:
-              - organizations:*
-              - lambda:*
-              - ecs:*
-              - ec2:*
-              - ecr-public:*
-              - ecr:*
-              - apigateway:*
-              - execute-api:*
+            - Action: "*"
+              # - organizations:*
+              # - lambda:*
+              # - ecs:*
+              # - ec2:*
+              # - ecr-public:*
+              # - ecr:*
+              # - apigateway:*
+              # - execute-api:*
+              # - iam:*
+              # - ecs-tasks:*
               Resource: "*"
               Effect: Allow
-      ManagedPolicyArns:
-        - "arn:aws:iam::aws:policy/AmazonS3FullAccess" 
-        - "arn:aws:iam::aws:policy/AWSLambda_FullAccess"
-        - "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"
+      # ManagedPolicyArns:
+      #   - "arn:aws:iam::aws:policy/AmazonS3FullAccess" 
+      #   - "arn:aws:iam::aws:policy/AWSLambda_FullAccess"
+      #   - "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"
   
   # LambdaWebhook:
   #   Type: AWS::CodePipeline::Webhook

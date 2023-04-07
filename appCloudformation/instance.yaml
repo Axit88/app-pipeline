@@ -132,11 +132,6 @@ Resources:
     Properties:
       Path: "/"
       RoleName: !Ref RoleName
-      Tags:
-        - Key: env 
-          Value: integration 
-        - Key: application 
-          Value: ec2 
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
