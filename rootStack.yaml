@@ -21,9 +21,7 @@ Resources:
         PublicSubnet2CIDR: 10.0.16.0/20
         PrivateSubnet1CIDR: 10.0.128.0/20
         PrivateSubnet2CIDR: 10.0.144.0/20
-
-  # All Data Stores
-  
+ 
   EcsNestedStack:
     Type: AWS::CloudFormation::Stack
     Properties:
