@@ -115,3 +115,12 @@ Resources:
         - IpProtocol: -1
           CidrIp: "0.0.0.0/0"
           
+Outputs:
+  LambdaFunctionName:
+    Description: Lambda Function Name
+    Value: !Ref LambdaFunction
+    
+  LambdaFunctionArn:
+    Description: Lambda Function Arn
+    Value: !GetAtt LambdaFunction.Arn
+    
