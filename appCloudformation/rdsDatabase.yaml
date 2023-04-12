@@ -1,0 +1,91 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Creating aws rds instance.
+
+Parameters:
+  SecurityGroupName:
+    Type: String
+    Default: default-db-security-group
+  AllocateStorage:
+    Type: Number
+    Default: 20
+  DBInstanceClass:
+    Type: String
+    Default: db.t3.micro
+  DBInstanceIdentifier:
+    Type: String
+    Default: default-db-instance 
+  Username:
+    Type: String
+    Default: admin
+  Password:
+    Type: String
+    Default: admin123
+  VpcId:
+    Type: String
+  CidrIp:
+    Type: String
+    Default: 0.0.0.0/0
+  Engine: 
+    Type: String
+    Default: mysql
+  Subnet1: 
+    Type: String
+  Subnet2: 
+    Type: String
+  SubnetGroupName:
+    Type: String
+    Default: default
+  BackupRetentionPeriod: 
+    Type: Number
+    Default: 7
+  SNSTopic: 
+    Type: String
+
+Resources:
+  DBInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      AllocatedStorage: !Ref AllocateStorage
+      DBInstanceClass: !Ref DBInstanceClass
+      DBInstanceIdentifier: !Ref DBInstanceIdentifier
+      Engine: !Ref Engine
+      MasterUsername: !Ref Username
+      MasterUserPassword: !Ref Password
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      BackupRetentionPeriod: !Ref BackupRetentionPeriod
+      StorageEncrypted: true
+      DeleteAutomatedBackups: false 
+      # KmsKeyId: arn:aws:kms:ap-northeast-1:803928384365:key/5c8d1c89-d70a-4eea-99a5-250bff394640
+      VPCSecurityGroups:
+        - !Ref DBSecurityGroup
+      PubliclyAccessible: true
+      MultiAZ: false
+      StorageType: gp2
+  
+  DBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Ref SecurityGroupName
+      GroupDescription: RDS security group
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '3306'
+          ToPort: '3306'
+          CidrIp: !Ref CidrIp
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: !Ref CidrIp
+
+  DBSubnetGroup:
+    Type: "AWS::RDS::DBSubnetGroup"
+    Properties: 
+      DBSubnetGroupName: !Ref SubnetGroupName
+      DBSubnetGroupDescription: Subnet group for DB instance
+      SubnetIds: 
+        - !Ref Subnet1
+        - !Ref Subnet2 
+        
+
+

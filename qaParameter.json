@@ -1,6 +1,6 @@
 {
     "Parameters": {
-        "Environment": "QA",
+        "Environment": "Qa",
         "BucketName": "axitsamplepipelinebucket"
     }
 }

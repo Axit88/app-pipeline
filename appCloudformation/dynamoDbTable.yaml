@@ -1,0 +1,88 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Creating dynamoDb table
+
+Parameters:
+  TableName:
+    Type: String
+    Default: defaultTable
+
+  AttributeName1:
+    Type: String
+    Default: id
+
+  AttributeType1: # S(string), N(Number), B(Binary)
+    Type: String
+    Default: S
+
+  AttributeKeyType1:   # HASH-partition key, RANGE-sort key
+    Type: String
+    Default: HASH
+
+  ReadCapacity:  # The maximum number of strongly consistent reads consumed per second. If you exceed this capacity than DynamoDB returns a ThrottlingException
+    Type: Number
+    Default: 1
+
+  WriteCapacity: # The maximum number of writes consumed per second. If you exceed this capacity than DynamoDB returns a ThrottlingException
+    Type: Number
+    Default: 1
+  
+  AttributeName2:
+    Type: String
+    Default: name 
+
+  AttributeType2: 
+    Type: String
+    Default: S
+
+  AttributeKeyType2:  
+    Type: String
+    Default: RANGE
+
+  SNSTopic: 
+    Type: String
+  
+  RouteTable: 
+    Type: String
+  
+  VpcId: 
+    Type: String
+
+Resources:
+  DynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TableName
+      AttributeDefinitions:
+        - AttributeName: !Ref AttributeName1
+          AttributeType: !Ref AttributeType1
+        - AttributeName: !Ref AttributeName2
+          AttributeType: !Ref AttributeType2
+      KeySchema:
+        - AttributeName: !Ref AttributeName1
+          KeyType: !Ref AttributeKeyType1
+        - AttributeName: !Ref AttributeName2
+          KeyType: !Ref AttributeKeyType2
+      ProvisionedThroughput:
+        ReadCapacityUnits: !Ref ReadCapacity
+        WriteCapacityUnits: !Ref WriteCapacity
+      # PointInTimeRecoverySpecification:
+      #   PointInTimeRecoveryEnabled: true  
+  
+DynamoDbGatewayEndpoint:
+  Type: 'AWS::EC2::VPCEndpoint'
+  Properties:
+    PolicyDocument:
+      Version: 2012-10-17
+      Statement:
+        - Effect: Allow
+          Principal: '*'
+          Action:
+            - '*'
+          Resource:
+            - '*'
+    RouteTableIds:
+      - !Ref RouteTable 
+    ServiceName: !Sub 'com.amazonaws.${AWS::Region}.dynamodb'
+    VpcId: !Ref VpcId 
+
+  

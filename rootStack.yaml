@@ -29,10 +29,10 @@ Resources:
       Parameters:
         ClusterName: !Sub ${Environment}ecs-cluster 
         TaskDefinitionFamilyName: !Sub ${Environment}default-ecs-task-family
-        ContainerName:  !Sub ${Environment}default-python-container
+        ContainerName:  !Sub ${Environment}-python-container
         ContainerImage: 803928384365.dkr.ecr.ap-northeast-1.amazonaws.com/python:latest
         ContainerPort: 5000
-        EcsServiceName: !Sub ${Environment}default-ecs-service
+        EcsServiceName: !Sub ${Environment}ecs-service
         EcsTaskExecutionRoleName: !Sub ${Environment}EcsTaskExecutionRole
         EcsSecurityGroupName: !Sub ${Environment}EcsSecurityGroup
         Subnet1: 
@@ -48,8 +48,6 @@ Resources:
             - VpcNestedStack
             - Outputs.VPC
 
-# All Serverless Infra And Workflows
-
   LambdaNestedStack:
     Type: AWS::CloudFormation::Stack
     Properties:
@@ -57,7 +55,7 @@ Resources:
       Parameters:
         S3Bucket: axitsamplepipelinebucket
         S3Key: archive.zip
-        LambdaFunctionName: !Sub ${Environment}nested-lambda-function
+        LambdaFunctionName: !Sub ${Environment}LambdaFunction
         RoleName: !Sub ${Environment}nested-lambda-role
         Runtime: go1.x
         Handler: main
@@ -90,14 +88,12 @@ Resources:
             - Outputs.LambdaFunctionName
         SNSTopic: !ImportValue SnsTopic
 
-# All EC2 Related Infra
-
   Ec2NestedStack:
     Type: AWS::CloudFormation::Stack
     Properties:
       TemplateURL: !Sub https://${BucketName}.s3.${AWS::Region}.amazonaws.com/appCloudformation/instance.yaml
       Parameters:
-        InstanceName: !Sub ${Environment}NewEc2Instance
+        InstanceName: !Sub ${Environment}Ec2Instance
         ImageId: ami-06fdbb60c8e83aa5e
         InstanceType: t2.micro
         Ec2SecurityGroupName: !Sub ${Environment}ec2-security-group
@@ -116,4 +112,56 @@ Resources:
           Fn::GetAtt:
             - VpcNestedStack
             - Outputs.PublicSubnet1
+
+  RdsNestedStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub https://${BucketName}.s3.${AWS::Region}.amazonaws.com/appCloudformation/rdsDatabase.yaml
+      Parameters:
+        SecurityGroupName: !Sub ${Environment}nested-rds-security-group
+        AllocateStorage: 20
+        DBInstanceClass: db.t3.micro
+        DBInstanceIdentifier: !Sub ${Environment}nestedRdsInstance
+        Username: admin
+        Password: admin123
+        SubnetGroupName: !Sub ${Environment}rdsSubnetGroup
+        BackupRetentionPeriod: 7
+        VpcId:
+          Fn::GetAtt:
+            - VpcNestedStack
+            - Outputs.VPC
+        CidrIp: 0.0.0.0/0
+        Engine: mysql
+        Subnet1:
+          Fn::GetAtt:
+            - VpcNestedStack
+            - Outputs.PublicSubnet1
+        Subnet2:
+          Fn::GetAtt:
+            - VpcNestedStack
+            - Outputs.PublicSubnet2
+        SNSTopic: !ImportValue SnsTopic 
   
+  DynamoDbNestedStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub https://${BucketName}.s3.${AWS::Region}.amazonaws.com/appCloudformation/dynamoDbTable.yaml
+      Parameters:
+        TableName: !Sub ${Environment}dynamoDbTable
+        AttributeName1: id
+        AttributeType1: S
+        AttributeKeyType1: HASH
+        ReadCapacity: 1
+        WriteCapacity: 1
+        AttributeName2: name
+        AttributeType2: S
+        AttributeKeyType2: RANGE
+        SNSTopic: !ImportValue SnsTopic 
+        VpcId:
+          Fn::GetAtt:
+            - VpcNestedStack
+            - Outputs.VPC
+        RouteTable:
+          Fn::GetAtt:
+            - VpcNestedStack
+            - Outputs.PrivateRouteTable
