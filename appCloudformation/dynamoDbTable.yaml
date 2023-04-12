@@ -68,21 +68,21 @@ Resources:
       # PointInTimeRecoverySpecification:
       #   PointInTimeRecoveryEnabled: true  
   
-DynamoDbGatewayEndpoint:
-  Type: 'AWS::EC2::VPCEndpoint'
-  Properties:
-    PolicyDocument:
-      Version: 2012-10-17
-      Statement:
-        - Effect: Allow
-          Principal: '*'
-          Action:
-            - '*'
-          Resource:
-            - '*'
-    RouteTableIds:
-      - !Ref RouteTable 
-    ServiceName: !Sub 'com.amazonaws.${AWS::Region}.dynamodb'
-    VpcId: !Ref VpcId 
+  DynamoDbGatewayEndpoint:
+    Type: 'AWS::EC2::VPCEndpoint'
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action:
+              - '*'
+            Resource:
+              - '*'
+      RouteTableIds:
+        - !Ref RouteTable 
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.dynamodb'
+      VpcId: !Ref VpcId 
 
   
